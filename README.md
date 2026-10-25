@@ -5,7 +5,7 @@ Poi uno script calcola alcune prime "dimensioni" (velocità delle mani, pause, p
 e confronta più sessioni, per esempio "mattina" e "sera".
 
 ## Struttura
- 
+
 ```
 tesi-hrc/
 ├── scarica_modelli.py        scarica i modelli di MediaPipe in models/
@@ -14,6 +14,7 @@ tesi-hrc/
 │   ├── acquisizione_pose.py  webcam (+ microfono) -> punti del corpo -> data/*_pose.csv
 │   ├── registra_audio.py     registrazione del microfono sincronizzata con il video
 │   ├── estrai_da_video.py    video -> viso (*_viso.csv) e mani (*_mani.csv)
+│   ├── estrai_emozioni.py    video -> emozioni, valenza e attivazione (*_emozioni.csv)
 │   └── analisi_sessione.py   CSV -> riepilogo e grafico di confronto
 ├── data/                     registrazioni (non vanno su Git)
 └── models/                   modelli scaricati (non vanno su Git)
@@ -58,6 +59,12 @@ Estrarre viso e mani dai video registrati con `--video` (può richiedere qualche
 python src/estrai_da_video.py data/*.mp4
 ```
 
+Stimare le emozioni dai video (il modello si scarica da solo al primo uso, circa 15 MB):
+
+```
+python src/estrai_emozioni.py data/*.mp4
+```
+
 Confrontare le sessioni:
 
 ```
@@ -66,6 +73,7 @@ python src/analisi_sessione.py data/*_mattina_pose.csv data/*_sera_pose.csv
 
 Se esistono i file del viso e delle mani, la tabella include anche ammiccamenti al minuto, tempo con gli occhi chiusi,
 sguardo verso il basso, sbadigli, visibilità delle mani e velocità delle dita.
+Se esiste il file delle emozioni, anche emozione prevalente, tempo neutro, valenza e attivazione medie.
 Se esiste il file audio, anche rumore di fondo, livello medio e percentuale di tempo con suoni sopra il fondo.
 Escono una tabella nel terminale, `data/riepilogo_sessioni.csv` e il grafico `data/confronto_sessioni.png`.
 
@@ -76,6 +84,9 @@ Escono una tabella nel terminale, `data/riepilogo_sessioni.csv` e il grafico `da
 - `*_eventi.csv`: i momenti in cui hai premuto SPAZIO.
 - `*_viso.csv`: per ogni fotogramma, i 52 valori del viso da 0 a 1 (es. `eyeBlinkLeft` = palpebra chiusa, `jawOpen` = bocca aperta).
 - `*_mani.csv`: per ogni mano visibile, i 21 punti `p0` ... `p20` (p0 = polso, p4 = punta del pollice, p8 = punta dell'indice).
+- `*_emozioni.csv`: un fotogramma ogni 5, con l'emozione prevalente, le probabilità di 8 emozioni
+  (rabbia, disprezzo, disgusto, paura, felicità, neutro, tristezza, sorpresa), la valenza (espressione positiva o negativa)
+  e l'attivazione (intensità). Modello: EmotiEffLib `enet_b0_8_va_mtl`, addestrato sul dataset AffectNet.
 - `*_info.json`: durata, fotogrammi al secondo, note e versioni usate.
 - `*.mp4`: il video grezzo, solo con `--video`.
 - `*.wav`: l'audio del microfono (16 kHz, mono), solo con `--audio`.
@@ -86,6 +97,12 @@ Escono una tabella nel terminale, `data/riepilogo_sessioni.csv` e il grafico `da
 - Webcam ferma, inquadratura dalla vita in su, con spalle e mani sempre visibili.
 - Luce frontale, non alle spalle.
 - Stesso compito, stessa posizione e stessa inquadratura in tutte le sessioni, così il confronto è corretto.
+
+## Impostazioni del computer per registrare
+
+- Windows: lasciare **disattivati i "Miglioramenti audio"** del microfono (Impostazioni → Sistema → Audio → Input).
+  Altrimenti la soppressione del rumore azzera i silenzi e il rumore dell'ambiente non si può misurare.
+  Il controllo `silenzio_digitale_%` nell'analisi deve restare vicino a 0.
 
 ## Problemi frequenti
 

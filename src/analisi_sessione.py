@@ -9,6 +9,8 @@ Calcola, per ogni sessione:
   - se esiste *_viso.csv (da estrai_da_video.py): ammiccamenti al minuto,
     percentuale di tempo con gli occhi chiusi, sbadigli
   - se esiste *_mani.csv: quanto sono visibili le mani e velocità delle dita
+  - se esiste *_emozioni.csv (da estrai_emozioni.py): emozione prevalente,
+    percentuale di tempo neutra, valenza e attivazione medie
   - se esiste il file audio .wav: rumore di fondo, livello medio e
     percentuale di tempo con suoni sopra il fondo (voce, carta, oggetti)
 
@@ -175,6 +177,15 @@ def analizza(percorso):
         mani = pd.read_csv(mani_csv)
         if len(mani):
             riepilogo.update(misure_mani(mani, len(df)))
+
+    emozioni_csv = Path(str(percorso).replace("_pose.csv", "_emozioni.csv"))
+    if emozioni_csv.exists():
+        emo = pd.read_csv(emozioni_csv)
+        if len(emo):
+            riepilogo["emozione_prevalente"] = emo["emozione"].mode().iloc[0]
+            riepilogo["neutro_%"] = round(float((emo["emozione"] == "neutro").mean() * 100), 1)
+            riepilogo["valenza_media"] = round(float(emo["valenza"].mean()), 3)
+            riepilogo["attivazione_media"] = round(float(emo["attivazione"].mean()), 3)
 
     wav = Path(str(percorso).replace("_pose.csv", ".wav"))
     if wav.exists():
