@@ -1,0 +1,11 @@
+# Dati registrati e modelli scaricati: non vanno su Git (pesanti e personali)
+data/*
+!data/.gitkeep
+models/*
+!models/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
