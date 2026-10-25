@@ -5,7 +5,7 @@ Poi uno script calcola alcune prime "dimensioni" (velocità delle mani, pause, p
 e confronta più sessioni, per esempio "mattina" e "sera".
 
 ## Struttura
-
+ 
 ```
 tesi-hrc/
 ├── scarica_modelli.py        scarica i modelli di MediaPipe in models/
