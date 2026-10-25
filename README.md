@@ -11,7 +11,8 @@ tesi-hrc/
 ├── scarica_modelli.py        scarica i modelli di MediaPipe in models/
 ├── requirements.txt          librerie Python necessarie
 ├── src/
-│   ├── acquisizione_pose.py  webcam -> punti del corpo -> data/*_pose.csv
+│   ├── acquisizione_pose.py  webcam (+ microfono) -> punti del corpo -> data/*_pose.csv
+│   ├── registra_audio.py     registrazione del microfono sincronizzata con il video
 │   ├── estrai_da_video.py    video -> viso (*_viso.csv) e mani (*_mani.csv)
 │   └── analisi_sessione.py   CSV -> riepilogo e grafico di confronto
 ├── data/                     registrazioni (non vanno su Git)
@@ -43,10 +44,13 @@ Registrare una sessione (si apre una finestra con il video). Durante la registra
 
 ```
 python src/acquisizione_pose.py --sessione mattina --note "riposata, ore 9"
-python src/acquisizione_pose.py --sessione sera --note "dopo una giornata di studio" --video
+python src/acquisizione_pose.py --sessione sera --note "dopo una giornata di studio" --video --audio
 ```
 
 Con `--video` salvi anche il video grezzo, utile per estrarre altri segnali più avanti (per esempio il viso).
+Con `--audio` registri anche il microfono: a schermo compare il livello del suono, per controllare che funzioni.
+Per usare un microfono diverso da quello predefinito: `python -m sounddevice` elenca i dispositivi,
+poi aggiungi `--microfono <numero>`.
 
 Estrarre viso e mani dai video registrati con `--video` (può richiedere qualche minuto):
 
@@ -62,6 +66,7 @@ python src/analisi_sessione.py data/*_mattina_pose.csv data/*_sera_pose.csv
 
 Se esistono i file del viso e delle mani, la tabella include anche ammiccamenti al minuto, tempo con gli occhi chiusi,
 sguardo verso il basso, sbadigli, visibilità delle mani e velocità delle dita.
+Se esiste il file audio, anche rumore di fondo, livello medio e percentuale di tempo con suoni sopra il fondo.
 Escono una tabella nel terminale, `data/riepilogo_sessioni.csv` e il grafico `data/confronto_sessioni.png`.
 
 ## Cosa contengono i file
@@ -73,6 +78,8 @@ Escono una tabella nel terminale, `data/riepilogo_sessioni.csv` e il grafico `da
 - `*_mani.csv`: per ogni mano visibile, i 21 punti `p0` ... `p20` (p0 = polso, p4 = punta del pollice, p8 = punta dell'indice).
 - `*_info.json`: durata, fotogrammi al secondo, note e versioni usate.
 - `*.mp4`: il video grezzo, solo con `--video`.
+- `*.wav`: l'audio del microfono (16 kHz, mono), solo con `--audio`.
+- `*_audio_tempi.csv`: per ogni blocco di 100 ms di audio, il tempo del suo primo campione sullo stesso orologio del video.
 
 ## Consigli per registrare
 

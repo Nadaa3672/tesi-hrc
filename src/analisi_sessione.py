@@ -9,6 +9,8 @@ Calcola, per ogni sessione:
   - se esiste *_viso.csv (da estrai_da_video.py): ammiccamenti al minuto,
     percentuale di tempo con gli occhi chiusi, sbadigli
   - se esiste *_mani.csv: quanto sono visibili le mani e velocità delle dita
+  - se esiste il file audio .wav: rumore di fondo, livello medio e
+    percentuale di tempo con suoni sopra il fondo (voce, carta, oggetti)
 
 Le distanze sono divise per la larghezza delle spalle, così non dipendono
 da quanto sei lontana dalla webcam ("unità spalle").
@@ -20,6 +22,7 @@ Uso:
 
 import argparse
 import glob
+import wave
 from pathlib import Path
 
 import matplotlib
@@ -112,6 +115,35 @@ def misure_mani(mani, fotogrammi_totali):
     }
 
 
+def misure_audio(percorso_wav):
+    """Livello del suono ogni 100 ms, in dBFS (0 = massimo, più negativo = più silenzio).
+    I dBFS sono relativi al microfono: confrontabili tra sessioni con lo stesso
+    microfono e le stesse impostazioni, non tra microfoni diversi."""
+    with wave.open(str(percorso_wav), "rb") as f:
+        frequenza = f.getframerate()
+        x = np.frombuffer(f.readframes(f.getnframes()), dtype=np.int16).astype(np.float64) / 32768.0
+    finestra = int(0.1 * frequenza)
+    n = len(x) // finestra
+    if n < 10:
+        return {}
+    rms = np.sqrt((x[:n * finestra].reshape(n, finestra) ** 2).mean(axis=1))
+    db = 20 * np.log10(rms + 1e-10)
+    # Sotto -90 dBFS non c'è suono vero ma "silenzio digitale" (campioni a zero):
+    # succede se il microfono è muto o se Windows sopprime il rumore. Lo escludiamo.
+    digitale = db < -90
+    validi = db[~digitale]
+    if len(validi) < 10:
+        return {"silenzio_digitale_%": round(float(digitale.mean() * 100), 1)}
+    fondo = np.percentile(validi, 10)  # il 10% più silenzioso = rumore di fondo della stanza
+    return {
+        "rumore_fondo_dbfs": round(float(fondo), 1),
+        "livello_medio_dbfs": round(float(np.median(validi)), 1),
+        "picco_dbfs": round(float(np.percentile(validi, 95)), 1),
+        "suoni_sopra_fondo_%": round(float((validi > fondo + 10).mean() * 100), 1),
+        "silenzio_digitale_%": round(float(digitale.mean() * 100), 1),
+    }
+
+
 def analizza(percorso):
     df = carica(percorso)
     scala = larghezza_spalle(df)
@@ -143,6 +175,10 @@ def analizza(percorso):
         mani = pd.read_csv(mani_csv)
         if len(mani):
             riepilogo.update(misure_mani(mani, len(df)))
+
+    wav = Path(str(percorso).replace("_pose.csv", ".wav"))
+    if wav.exists():
+        riepilogo.update(misure_audio(wav))
 
     serie = pd.DataFrame({"t_s": df["t_s"] - df["t_s"].iloc[0],
                           "velocita_mani": v_mani, "altezza_testa": testa})

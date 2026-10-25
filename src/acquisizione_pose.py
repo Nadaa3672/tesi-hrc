@@ -3,11 +3,11 @@
 Per ogni fotogramma trova i 33 punti del corpo (spalle, gomiti, polsi, ...)
 e li salva in un file CSV, insieme al tempo trascorso dall'inizio.
 Facoltativamente salva anche il video grezzo, per rielaborarlo in futuro
-(per esempio per estrarre il viso).
+(per esempio per estrarre il viso), e l'audio del microfono.
 
 Uso (dalla cartella del progetto):
     python src/acquisizione_pose.py --sessione mattina
-    python src/acquisizione_pose.py --sessione sera --video
+    python src/acquisizione_pose.py --sessione sera --video --audio
 
 Durante la registrazione, nella finestra del video:
     SPAZIO = segna un evento (es. inizio barchetta, fine barchetta, fine aeroplano)
@@ -26,6 +26,8 @@ import cv2
 import mediapipe as mp
 from mediapipe.tasks.python import BaseOptions, vision
 
+from registra_audio import RegistratoreAudio
+
 CARTELLA_PROGETTO = Path(__file__).resolve().parents[1]
 MODELLO = CARTELLA_PROGETTO / "models" / "pose_landmarker_full.task"
 CARTELLA_DATI = CARTELLA_PROGETTO / "data"
@@ -43,6 +45,10 @@ def leggi_argomenti():
                         help="Indice della webcam (0 = quella predefinita)")
     parser.add_argument("--video", action="store_true",
                         help="Salva anche il video grezzo (.mp4)")
+    parser.add_argument("--audio", action="store_true",
+                        help="Registra anche l'audio del microfono (.wav)")
+    parser.add_argument("--microfono", type=int, default=None,
+                        help="Indice del microfono (vedi: python -m sounddevice). Di default quello predefinito")
     parser.add_argument("--note", default="",
                         help="Note libere sulla sessione, es. 'dopo 8 ore di studio'")
     return parser.parse_args()
@@ -103,6 +109,11 @@ def main():
     ultimo_ms = -1
     inizio = time.perf_counter()
 
+    microfono = None
+    if args.audio:
+        microfono = RegistratoreAudio(base, inizio, args.microfono)
+        microfono.avvia()
+
     with vision.PoseLandmarker.create_from_options(opzioni) as rilevatore, \
             open(str(base) + "_pose.csv", "w", newline="") as file_csv:
         scrittore = csv.writer(file_csv)
@@ -122,6 +133,8 @@ def main():
 
             if registratore is not None:
                 registratore.write(immagine)
+            if microfono is not None:
+                microfono.svuota()
 
             rgb = cv2.cvtColor(immagine, cv2.COLOR_BGR2RGB)
             risultato = rilevatore.detect_for_video(
@@ -141,6 +154,9 @@ def main():
                         (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
             cv2.putText(immagine, f"Eventi: {len(eventi)}   (SPAZIO = evento, Q = stop)",
                         (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+            if microfono is not None and microfono.ultimo_db is not None:
+                cv2.putText(immagine, f"Audio: {microfono.ultimo_db:6.1f} dBFS",
+                            (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
             cv2.imshow("Acquisizione posa", immagine)
             frame += 1
 
@@ -152,6 +168,7 @@ def main():
                 break
 
     durata = time.perf_counter() - inizio
+    info_audio = microfono.ferma() if microfono is not None else {}
     webcam.release()
     if registratore is not None:
         registratore.release()
@@ -177,6 +194,8 @@ def main():
         "mediapipe": mp.__version__,
         "video_salvato": bool(args.video),
         "eventi": len(eventi),
+        "audio_salvato": bool(args.audio),
+        **info_audio,
     }
     with open(str(base) + "_info.json", "w", encoding="utf-8") as f:
         json.dump(info, f, indent=2, ensure_ascii=False)
