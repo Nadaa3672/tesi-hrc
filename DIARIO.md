@@ -2,6 +2,16 @@
 
 Le decisioni di progetto più importanti, con il motivo. Le voci più recenti sono in alto.
 
+## 30 ottobre 2026 – Verifica dell'orientamento della testa
+
+- Prova 1 (muovendo solo gli occhi): `testa_pitch` quasi fermo (tra 1° e 5°).
+  Corretto: l'angolo misura la testa, non lo sguardo (lo sguardo è nei valori `eyeLook*` del viso).
+- Prova 2 (muovendo la testa, medie ogni 5 s): dritto −7,2° → giù +23,4° → passaggio −8,0° → su −32,0° → dritto −1,4°;
+  `testa_yaw` sempre entro ±1,2°.
+  **Convenzione: pitch positivo = testa abbassata, negativo = testa alzata.** Escursione di circa 55° tra giù e su.
+- Lo zero non è assoluto (con la testa dritta ≈ −7°, dipende da dove sta la webcam):
+  nelle analisi conta il cambiamento rispetto alla stessa persona.
+
 ## 29 ottobre 2026 – Incontro 3: nuova direzione
 
 - Il prof chiede di: (1) aggiungere la **profondità** (MediaPipe o modelli monoculari, anche se meno precisi);
@@ -21,7 +31,7 @@ Le decisioni di progetto più importanti, con il motivo. Le voci più recenti so
   Motivo: garantire che le due analisi calcolino le misure esattamente nello stesso modo.
 - **Orientamento della testa** (pitch, yaw, roll) dalla matrice di trasformazione del Face Landmarker.
   Motivo: la testa che cade o ciondola è un segnale classico di sonnolenza.
-  Da verificare il segno degli angoli con una prova (guardare in basso e poi in alto).
+  Segno verificato il 30/10 (vedi sopra).
 - **Controllo di qualità sui "salti" tra fotogrammi**: in un test c'era una pausa di circa 2 s.
   Le velocità non vengono più calcolate attraverso un salto (> 0,5 s), e l'analisi segnala i salti oltre 1 s.
   Effetto collaterale: "mani ferme %" ora è calcolata solo sui fotogrammi validi, quindi i valori possono

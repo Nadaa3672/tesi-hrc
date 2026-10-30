@@ -113,7 +113,8 @@ Le velocità non vengono calcolate attraverso un "salto" tra fotogrammi.
   `x` e `y` (posizione nell'immagine, da 0 a 1), `z` (profondità relativa) e `vis` (visibilità, da 0 a 1).
 - `*_eventi.csv`: i momenti in cui hai premuto SPAZIO.
 - `*_viso.csv`: per ogni fotogramma, i 52 valori del viso da 0 a 1 (es. `eyeBlinkLeft` = palpebra chiusa,
-  `jawOpen` = bocca aperta) e l'orientamento della testa in gradi: `testa_pitch` (su/giù),
+  `jawOpen` = bocca aperta) e l'orientamento della testa in gradi: `testa_pitch` (su/giù:
+  positivo = testa abbassata, negativo = testa alzata; lo zero dipende dall'altezza della webcam),
   `testa_yaw` (destra/sinistra), `testa_roll` (testa inclinata).
 - `*_mani.csv`: per ogni mano visibile, i 21 punti `p0` ... `p20` (p0 = polso, p4 = punta del pollice,
   p8 = punta dell'indice).

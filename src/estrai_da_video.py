@@ -4,7 +4,10 @@ Per ogni video crea, accanto al video, i file della sessione:
   *_viso.csv  i 52 "blendshape" del viso, cioè quanto è attivo ogni movimento
               (es. eyeBlinkLeft = palpebra sinistra chiusa, jawOpen = bocca aperta),
               con valori da 0 a 1, più l'orientamento della testa in gradi:
-              testa_pitch (su/giù), testa_yaw (destra/sinistra), testa_roll (inclinata)
+              testa_pitch (su/giù: POSITIVO = testa verso il basso, NEGATIVO = verso l'alto),
+              testa_yaw (destra/sinistra), testa_roll (inclinata).
+              Lo zero dipende dall'altezza della webcam: conta il cambiamento
+              rispetto alla stessa persona, non il valore assoluto.
   *_mani.csv  i 21 punti di ogni mano visibile (x, y, z)
   *_pose.csv  i 33 punti del corpo, SOLO se non esiste già. Serve per i video che
               non vengono dal nostro script di acquisizione (per esempio quelli
@@ -54,7 +57,8 @@ def tempi_dalla_posa(video):
 
 def angoli_testa(matrice):
     """Dalla matrice di trasformazione del viso (4x4) all'orientamento della testa,
-    in gradi: pitch (su/giù), yaw (destra/sinistra), roll (testa inclinata)."""
+    in gradi: pitch (su/giù), yaw (destra/sinistra), roll (testa inclinata).
+    Verificato il 30/10/2026: pitch positivo = testa abbassata, negativo = testa alzata."""
     r = np.asarray(matrice, dtype=float)[:3, :3]
     pitch = math.degrees(math.atan2(r[2, 1], r[2, 2]))
     yaw = math.degrees(math.atan2(-r[2, 0], math.hypot(r[2, 1], r[2, 2])))
