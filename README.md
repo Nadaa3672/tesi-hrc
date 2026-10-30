@@ -1,29 +1,37 @@
-# Tesi HRC – acquisizione dei segnali sulla persona
+# Tesi HRC – acquisizione e analisi di segnali sulla persona
 
-Primo pezzo del framework: la webcam registra la posa del corpo con MediaPipe e la salva su file.
-Poi uno script calcola alcune prime "dimensioni" (velocità delle mani, pause, posizione della testa)
-e confronta più sessioni, per esempio "mattina" e "sera".
+Framework in Python che, con webcam e microfono, raccoglie segnali su una persona mentre lavora
+(corpo, mani, viso, orientamento della testa, emozioni, audio), li sincronizza sullo stesso orologio
+e li trasforma in misure ("dimensioni") per sessione e per finestre di tempo.
+Le misure a finestre sono la base per la profilazione della persona (per esempio stanchezza o vigilanza).
+
+Funziona anche su video non registrati con questo progetto, per esempio quelli di un dataset pubblico:
+in quel caso la posa del corpo viene estratta direttamente dal video.
 
 ## Struttura
 
 ```
 tesi-hrc/
-├── scarica_modelli.py        scarica i modelli di MediaPipe in models/
-├── requirements.txt          librerie Python necessarie
+├── scarica_modelli.py         scarica i modelli di MediaPipe in models/
+├── requirements.txt           librerie Python necessarie
+├── DIARIO.md                  diario di bordo: decisioni prese e perché
 ├── src/
-│   ├── acquisizione_pose.py  webcam (+ microfono) -> punti del corpo -> data/*_pose.csv
-│   ├── registra_audio.py     registrazione del microfono sincronizzata con il video
-│   ├── estrai_da_video.py    video -> viso (*_viso.csv) e mani (*_mani.csv)
-│   ├── estrai_emozioni.py    video -> emozioni, valenza e attivazione (*_emozioni.csv)
-│   └── analisi_sessione.py   CSV -> riepilogo e grafico di confronto
-├── data/                     registrazioni (non vanno su Git)
-└── models/                   modelli scaricati (non vanno su Git)
+│   ├── acquisizione_pose.py   webcam (+ microfono) -> corpo in tempo reale, video, audio, eventi
+│   ├── registra_audio.py      registrazione del microfono sincronizzata con il video
+│   ├── estrai_da_video.py     video -> viso + orientamento della testa, mani (e corpo, se manca)
+│   ├── estrai_emozioni.py     video -> emozioni, valenza e attivazione
+│   ├── misure.py              tutte le misure, usate da entrambe le analisi
+│   ├── analisi_sessione.py    riepilogo di sessioni intere + grafico di confronto
+│   ├── analisi_finestre.py    misure ogni N secondi -> "tabella delle finestre"
+│   └── elabora.py             comando unico: esegue i passaggi che mancano su uno o più video
+├── data/                      registrazioni (non vanno su Git)
+└── models/                    modelli scaricati (non vanno su Git)
 ```
 
 ## Installazione (Windows, una volta sola)
 
 1. Apri la cartella `tesi-hrc` in Visual Studio Code (**File → Apri cartella**).
-2. Installa l'estensione **Python** di Microsoft, se non c'è già (icona dei quadratini a sinistra).
+2. Installa l'estensione **Python** di Microsoft, se non c'è già.
 3. Apri il terminale di VS Code (**Terminale → Nuovo terminale**) e crea l'ambiente:
 
    ```
@@ -40,69 +48,92 @@ spostati nella cartella con `cd percorso\della\cartella\tesi-hrc` ed esegui gli 
 
 ## Uso
 
-Registrare una sessione (si apre una finestra con il video). Durante la registrazione premi
-**SPAZIO** per segnare un evento (es. inizio e fine di un compito) e **Q** per fermare:
+### 1. Registrare una sessione
+
+Si apre una finestra con il video. Durante la registrazione premi **SPAZIO** per segnare un evento
+(es. inizio e fine di un compito) e **Q** per fermare:
 
 ```
-python src/acquisizione_pose.py --sessione mattina --note "riposata, ore 9"
-python src/acquisizione_pose.py --sessione sera --note "dopo una giornata di studio" --video --audio
+python src/acquisizione_pose.py --sessione mattina --video --audio --note "KSS 3, ore 9"
 ```
 
-Con `--video` salvi anche il video grezzo, utile per estrarre altri segnali più avanti (per esempio il viso).
-Con `--audio` registri anche il microfono: a schermo compare il livello del suono, per controllare che funzioni.
-Per usare un microfono diverso da quello predefinito: `python -m sounddevice` elenca i dispositivi,
-poi aggiungi `--microfono <numero>`.
+- `--video` salva il video grezzo: serve per estrarre viso, mani ed emozioni.
+- `--audio` registra il microfono; a schermo compare il livello del suono.
+  Per un microfono diverso da quello predefinito: `python -m sounddevice`, poi `--microfono <numero>`.
 
-Estrarre viso e mani dai video registrati con `--video` (può richiedere qualche minuto):
-
-```
-python src/estrai_da_video.py data/*.mp4
-```
-
-Stimare le emozioni dai video (il modello si scarica da solo al primo uso, circa 15 MB):
+### 2. Elaborare i video (comando unico)
 
 ```
-python src/estrai_emozioni.py data/*.mp4
+python src/elabora.py data/*.mp4 --persona P01 --etichetta riposata
 ```
 
-Confrontare le sessioni:
+Per ogni video esegue solo i passaggi che mancano: posa, viso, testa e mani; emozioni; misure su
+finestre di 30 secondi (file `*_finestre.csv`). Stampa anche un controllo di qualità
+(fotogrammi al secondo e "salti" tra fotogrammi). Con `--forza` rifà tutto.
+Il modello delle emozioni si scarica da solo al primo uso (circa 15 MB).
+
+### 3. Analizzare
+
+Riepilogo di sessioni intere, con grafico:
 
 ```
 python src/analisi_sessione.py data/*_mattina_pose.csv data/*_sera_pose.csv
 ```
 
-Se esistono i file del viso e delle mani, la tabella include anche ammiccamenti al minuto, tempo con gli occhi chiusi,
-sguardo verso il basso, sbadigli, visibilità delle mani e velocità delle dita.
-Se esiste il file delle emozioni, anche emozione prevalente, tempo neutro, valenza e attivazione medie.
-Se esiste il file audio, anche rumore di fondo, livello medio e percentuale di tempo con suoni sopra il fondo.
-Escono una tabella nel terminale, `data/riepilogo_sessioni.csv` e il grafico `data/confronto_sessioni.png`.
+Tabella delle finestre di più sessioni insieme (per la profilazione):
 
-## Cosa contengono i file
+```
+python src/analisi_finestre.py data/*_pose.csv --persona P01 --etichetta riposata
+python src/analisi_finestre.py --elenco elenco_sessioni.csv --finestra 30
+```
 
-- `*_pose.csv`: una riga per fotogramma con il tempo `t_s` (secondi dall'inizio) e, per ognuno dei 33 punti
-  del corpo, `x` e `y` (posizione nell'immagine, da 0 a 1), `z` (profondità relativa) e `vis` (quanto il punto è visibile, da 0 a 1).
+L'elenco è un CSV con le colonne `file, persona, etichetta`, una riga per sessione
+(`file` = un qualunque file della sessione, anche il video). Le finestre in cui la persona
+si vede per meno di metà del tempo vengono scartate.
+
+## Le misure
+
+| Gruppo | Misure |
+| --- | --- |
+| Qualità | fotogrammi al secondo, salto massimo tra due fotogrammi, numero di salti oltre 0,5 s |
+| Corpo | velocità delle mani (polsi), % di tempo con le mani ferme, altezza della testa sopra le spalle |
+| Viso | ammiccamenti al minuto, % occhi chiusi, chiusura media degli occhi, sguardo in basso, sbadigli |
+| Testa | inclinazione media su/giù (pitch) e variabilità di pitch, yaw e roll |
+| Mani | % di tempo con le mani visibili, velocità della punta dell'indice |
+| Emozioni | emozione prevalente, % neutro, valenza e attivazione medie |
+| Audio | silenzio digitale %, rumore di fondo, livello medio, picco, % suoni sopra il fondo |
+
+Le distanze del corpo sono divise per la larghezza delle spalle, quelle delle mani per la
+grandezza della mano: così non dipendono dalla distanza dalla webcam.
+Le velocità non vengono calcolate attraverso un "salto" tra fotogrammi.
+
+## Cosa contengono i file di una sessione
+
+- `*_pose.csv`: una riga per fotogramma con il tempo `t_s` e, per ognuno dei 33 punti del corpo,
+  `x` e `y` (posizione nell'immagine, da 0 a 1), `z` (profondità relativa) e `vis` (visibilità, da 0 a 1).
 - `*_eventi.csv`: i momenti in cui hai premuto SPAZIO.
-- `*_viso.csv`: per ogni fotogramma, i 52 valori del viso da 0 a 1 (es. `eyeBlinkLeft` = palpebra chiusa, `jawOpen` = bocca aperta).
-- `*_mani.csv`: per ogni mano visibile, i 21 punti `p0` ... `p20` (p0 = polso, p4 = punta del pollice, p8 = punta dell'indice).
-- `*_emozioni.csv`: un fotogramma ogni 5, con l'emozione prevalente, le probabilità di 8 emozioni
-  (rabbia, disprezzo, disgusto, paura, felicità, neutro, tristezza, sorpresa), la valenza (espressione positiva o negativa)
-  e l'attivazione (intensità). Modello: EmotiEffLib `enet_b0_8_va_mtl`, addestrato sul dataset AffectNet.
+- `*_viso.csv`: per ogni fotogramma, i 52 valori del viso da 0 a 1 (es. `eyeBlinkLeft` = palpebra chiusa,
+  `jawOpen` = bocca aperta) e l'orientamento della testa in gradi: `testa_pitch` (su/giù),
+  `testa_yaw` (destra/sinistra), `testa_roll` (testa inclinata).
+- `*_mani.csv`: per ogni mano visibile, i 21 punti `p0` ... `p20` (p0 = polso, p4 = punta del pollice,
+  p8 = punta dell'indice).
+- `*_emozioni.csv`: un fotogramma ogni 5, con l'emozione prevalente, le probabilità di 8 emozioni,
+  la valenza (espressione positiva o negativa) e l'attivazione (intensità).
+  Modello: EmotiEffLib `enet_b0_8_va_mtl`, addestrato sul dataset AffectNet.
+- `*_finestre.csv`: le misure ogni 30 secondi.
 - `*_info.json`: durata, fotogrammi al secondo, note e versioni usate.
-- `*.mp4`: il video grezzo, solo con `--video`.
-- `*.wav`: l'audio del microfono (16 kHz, mono), solo con `--audio`.
+- `*.mp4`: il video grezzo. `*.wav`: l'audio (16 kHz, mono).
 - `*_audio_tempi.csv`: per ogni blocco di 100 ms di audio, il tempo del suo primo campione sullo stesso orologio del video.
 
 ## Consigli per registrare
 
-- Webcam ferma, inquadratura dalla vita in su, con spalle e mani sempre visibili.
+- Webcam ferma, inquadratura dalla vita in su, con viso, spalle e mani sempre visibili.
 - Luce frontale, non alle spalle.
-- Stesso compito, stessa posizione e stessa inquadratura in tutte le sessioni, così il confronto è corretto.
-
-## Impostazioni del computer per registrare
-
+- Stesso compito, stessa posizione e stessa inquadratura in tutte le sessioni.
 - Windows: lasciare **disattivati i "Miglioramenti audio"** del microfono (Impostazioni → Sistema → Audio → Input).
-  Altrimenti la soppressione del rumore azzera i silenzi e il rumore dell'ambiente non si può misurare.
-  Il controllo `silenzio_digitale_%` nell'analisi deve restare vicino a 0.
+  Altrimenti la soppressione del rumore azzera i silenzi. Il controllo `silenzio_digitale_%` deve restare vicino a 0.
+- Evitare che altri programmi pesanti (o la sincronizzazione di OneDrive) lavorino durante la registrazione:
+  causano "salti" tra fotogrammi.
 
 ## Problemi frequenti
 

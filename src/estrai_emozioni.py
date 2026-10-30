@@ -40,7 +40,7 @@ EMOZIONI = ["rabbia", "disprezzo", "disgusto", "paura", "felicita", "neutro", "t
 
 
 def tempi_dalla_posa(video):
-    posa = Path(str(video).replace(".mp4", "_pose.csv"))
+    posa = Path(str(Path(video).with_suffix("")) + "_pose.csv")
     if posa.exists():
         df = pd.read_csv(posa, usecols=["frame", "t_s"])
         return dict(zip(df["frame"], df["t_s"]))
@@ -91,7 +91,7 @@ def elabora(video, ogni, emozioni):
     filmato = cv2.VideoCapture(str(video))
     fps = filmato.get(cv2.CAP_PROP_FPS) or 30
     totale = int(filmato.get(cv2.CAP_PROP_FRAME_COUNT))
-    uscita = str(video).replace(".mp4", "_emozioni.csv")
+    uscita = str(video.with_suffix("")) + "_emozioni.csv"
 
     with crea_rilevatore_viso() as viso, open(uscita, "w", newline="") as f:
         scrittore = csv.writer(f)
@@ -124,7 +124,7 @@ def elabora(video, ogni, emozioni):
 
 def main():
     parser = argparse.ArgumentParser(description="Stima le emozioni dal viso nei video registrati.")
-    parser.add_argument("video", nargs="+", help="Uno o più file .mp4")
+    parser.add_argument("video", nargs="+", help="Uno o più file video (.mp4, .mov, .avi...)")
     parser.add_argument("--ogni", type=int, default=5,
                         help="Analizza un fotogramma ogni N (default 5)")
     args = parser.parse_args()
