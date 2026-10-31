@@ -1,10 +1,12 @@
 """Un comando unico che elabora uno o più video dall'inizio alla fine.
 
 Per ogni video esegue solo i passaggi che mancano:
-  1. posa, viso, testa e mani   (estrai_da_video.py)   -> *_pose.csv, *_viso.csv, *_mani.csv
+  1. posa, profondità, viso, testa e mani (estrai_da_video.py)
+                                 -> *_pose.csv, *_pose3d.csv, *_viso.csv, *_mani.csv
   2. emozioni                    (estrai_emozioni.py)   -> *_emozioni.csv
   3. misure su finestre di tempo (analisi_finestre.py)  -> *_finestre.csv
 e alla fine stampa un breve controllo di qualità.
+Se hai importato l'orologio (importa_orologio.py), le sue misure entrano nelle finestre.
 
 Con --forza rifà tutti i passaggi anche se i file esistono già
 (utile dopo un aggiornamento del codice, per esempio per avere l'orientamento della testa).
@@ -59,11 +61,14 @@ def main():
         base = estrai_da_video.base_video(video)
         print(f"\n=== {video.name} ===")
 
-        if args.forza or manca_orientamento_testa(base) or not esiste(base, "_mani.csv"):
-            print("1. Estraggo posa, viso, testa e mani...")
+        if (args.forza or manca_orientamento_testa(base) or not esiste(base, "_mani.csv")
+                or not esiste(base, "_pose3d.csv")):
+            if args.forza:  # rifà anche la profondità
+                Path(str(base) + "_pose3d.csv").unlink(missing_ok=True)
+            print("1. Estraggo posa, profondità, viso, testa e mani...")
             estrai_da_video.elabora(video)
         else:
-            print("1. Posa, viso, testa e mani: già presenti.")
+            print("1. Posa, profondità, viso, testa e mani: già presenti.")
 
         if args.forza or not esiste(base, "_emozioni.csv"):
             print("2. Stimo le emozioni...")
@@ -86,6 +91,8 @@ def main():
                   f"salti oltre 0,5 s: {qualita.get('pause_oltre_0.5s')}")
             if (qualita.get("pausa_max_s") or 0) > 1.0:
                 print("   Attenzione: c'è almeno un salto di oltre 1 secondo tra due fotogrammi.")
+        if esiste(base, "_orologio.csv"):
+            print("   Orologio: presente, le sue misure sono nelle finestre.")
 
     print("\nFatto.")
 

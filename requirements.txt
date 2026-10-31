@@ -2,6 +2,7 @@ mediapipe==1.1.1
 opencv-python
 numpy
 pandas
+scipy
 matplotlib
 sounddevice
 emotiefflib

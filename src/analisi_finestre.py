@@ -18,6 +18,7 @@ Due modi di indicare persona ed etichetta:
 Opzioni: --finestra (secondi, default 30), --passo (secondi, default = finestra,
 cioè finestre che non si sovrappongono), --uscita (default data/finestre.csv).
 Le finestre in cui la persona si vede per meno di metà del tempo vengono scartate.
+Funziona anche con sessioni di solo orologio (create da importa_orologio.py senza --sessione).
 """
 
 import argparse
@@ -34,10 +35,13 @@ COPERTURA_MINIMA = 50  # % minima di fotogrammi con la persona visibile
 
 def finestre_di_una_sessione(base, persona, etichetta, durata, passo):
     sessione = misure.carica_sessione(base)
-    riferimento = sessione["posa"] if sessione["posa"] is not None else sessione["viso"]
+    # Il tempo di riferimento: la webcam se c'è, altrimenti solo l'orologio
+    riferimento = next((sessione[k] for k in ("posa", "viso", "orologio") if sessione[k] is not None), None)
     if riferimento is None or len(riferimento) < 10:
-        print(f"  {sessione['nome']}: nessun dato di posa o viso, salto la sessione.")
+        print(f"  {sessione['nome']}: nessun dato di posa, viso o orologio, salto la sessione.")
         return []
+    if sessione["posa"] is None and sessione["viso"] is None:
+        riferimento = riferimento[riferimento["gyr_x"].notna()]  # solo i campioni dell'orologio presenti
 
     tempi = riferimento["t_s"]
     inizio_sessione, fine_sessione = tempi.iloc[0], tempi.iloc[-1]

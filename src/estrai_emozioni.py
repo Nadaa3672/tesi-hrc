@@ -23,6 +23,7 @@ Uso:
 import argparse
 import csv
 import glob
+import os
 from pathlib import Path
 
 import cv2
@@ -93,7 +94,8 @@ def elabora(video, ogni, emozioni):
     totale = int(filmato.get(cv2.CAP_PROP_FRAME_COUNT))
     uscita = str(video.with_suffix("")) + "_emozioni.csv"
 
-    with crea_rilevatore_viso() as viso, open(uscita, "w", newline="") as f:
+    # Si scrive in un file temporaneo, rinominato solo alla fine (vedi estrai_da_video.parziale)
+    with crea_rilevatore_viso() as viso, open(uscita + ".parziale", "w", newline="") as f:
         scrittore = csv.writer(f)
         scrittore.writerow(["frame", "t_s", "emozione"] + EMOZIONI + ["valenza", "attivazione"])
         frame, analizzati, con_viso, ultimo_ms = 0, 0, 0, -1
@@ -119,6 +121,7 @@ def elabora(video, ogni, emozioni):
                 print(f"  {video.name}: {frame}/{totale} fotogrammi")
 
     filmato.release()
+    os.replace(uscita + ".parziale", uscita)
     print(f"{video.name}: emozioni stimate in {con_viso}/{analizzati} fotogrammi analizzati -> {Path(uscita).name}")
 
 

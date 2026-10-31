@@ -5,9 +5,12 @@ oppure una finestra di pochi secondi) e restituisce un dizionario di numeri.
 La usano sia analisi_sessione.py sia analisi_finestre.py, così le due analisi
 calcolano le misure esattamente nello stesso modo.
 
-Le distanze del corpo sono divise per la larghezza delle spalle ("unità spalle"),
-quelle delle mani per la grandezza della mano ("unità mano"): così non
-dipendono dalla distanza dalla webcam.
+Le distanze del corpo nell'immagine sono divise per la larghezza delle spalle
+("unità spalle"), quelle delle mani per la grandezza della mano ("unità mano"):
+così non dipendono dalla distanza dalla webcam. Le misure degli arti usano invece
+la posa in metri (*_pose3d.csv), da cui si ricavano angoli e velocità reali.
+Le misure dell'orologio sono le stesse che calcoliamo sul dataset di Yasar et al.,
+così i due si possono confrontare.
 """
 
 import wave
@@ -23,6 +26,8 @@ SOGLIA_RIAPERTI = 0.35    # sotto questa gli occhi tornano "aperti" (isteresi)
 SOGLIA_BOCCA = 0.5        # apertura della bocca per uno sbadiglio
 DURATA_SBADIGLIO = 1.5    # secondi minimi di bocca aperta
 SOGLIA_PAUSA = 0.5        # secondi tra due fotogrammi oltre cui c'è un "salto"
+SOGLIA_BRACCIO_ALZATO = 45  # gradi: braccio (spalla-gomito) sollevato oltre questo angolo
+SOGLIA_POLSO_FERMO = 0.1    # rad/s: sotto, il polso con l'orologio è considerato fermo
 
 
 def arrotonda(valore, cifre=3):
@@ -38,7 +43,8 @@ def base_sessione(percorso):
     Es. data/20261018_175018_mattina_pose.csv -> data/20261018_175018_mattina"""
     percorso = Path(percorso)
     nome = percorso.stem
-    for suffisso in ("_pose", "_viso", "_mani", "_emozioni", "_eventi", "_info",
+    for suffisso in ("_pose3d", "_pose", "_viso", "_mani", "_emozioni", "_eventi",
+                     "_orologio_info", "_orologio", "_battito", "_info",
                      "_audio_tempi", "_finestre"):
         if nome.endswith(suffisso):
             nome = nome[: -len(suffisso)]
@@ -59,6 +65,9 @@ def carica_sessione(base):
     sessione = {
         "nome": Path(base).name,
         "posa": leggi_se_esiste(base, "_pose.csv"),
+        "posa3d": leggi_se_esiste(base, "_pose3d.csv"),
+        "orologio": leggi_se_esiste(base, "_orologio.csv"),
+        "battito": leggi_se_esiste(base, "_battito.csv"),
         "viso": leggi_se_esiste(base, "_viso.csv"),
         "mani": leggi_se_esiste(base, "_mani.csv"),
         "emozioni": leggi_se_esiste(base, "_emozioni.csv"),
@@ -130,6 +139,146 @@ def misure_corpo(posa, scala):
         "velocita_mani_media": arrotonda(validi.mean()) if len(validi) else None,
         "mani_ferme_%": arrotonda((validi < SOGLIA_FERMO).mean() * 100, 1) if len(validi) else None,
         "altezza_testa_media": arrotonda(altezza_testa(posa, scala).mean()),
+    }
+
+
+# ---------------------------------------------------------------- arti (posa in metri)
+
+def _punto(p3d, nome):
+    return p3d[[f"{nome}_x", f"{nome}_y", f"{nome}_z"]].to_numpy(dtype=float)
+
+
+def _angolo(u, v):
+    """Angolo in gradi tra due serie di vettori (una riga per fotogramma)."""
+    coseno = (u * v).sum(axis=1) / (np.linalg.norm(u, axis=1) * np.linalg.norm(v, axis=1) + 1e-9)
+    return np.degrees(np.arccos(np.clip(coseno, -1, 1)))
+
+
+def _visibili(p3d, posa, nomi):
+    """True per i fotogrammi in cui tutti i punti indicati sono ben visibili
+    (la visibilità è nel file *_pose.csv, stesso numero di fotogramma)."""
+    if posa is None:
+        return np.ones(len(p3d), dtype=bool)
+    vis = posa.set_index("frame")[[f"{n}_vis" for n in nomi]].min(axis=1)
+    return (p3d["frame"].map(vis).fillna(0) > SOGLIA_VISIBILITA).to_numpy()
+
+
+def angoli_arti(p3d, posa=None):
+    """Per ogni fotogramma: angoli di gomiti e braccia, allungamento, inclinazione del busto.
+    Assi di MediaPipe (metri): y verso il basso, quindi "giù" = (0, 1, 0)."""
+    giu = np.array([0.0, 1.0, 0.0])
+    risultato = pd.DataFrame({"frame": p3d["frame"], "t_s": p3d["t_s"]})
+    for lato, nome in (("left", "sx"), ("right", "dx")):
+        spalla, gomito, polso = (_punto(p3d, f"{lato}_{p}") for p in ("shoulder", "elbow", "wrist"))
+        ok = _visibili(p3d, posa, [f"{lato}_shoulder", f"{lato}_elbow", f"{lato}_wrist"])
+        braccio, avambraccio = gomito - spalla, polso - gomito
+        # 180° = braccio disteso, valori piccoli = gomito molto piegato
+        gomito_ang = _angolo(-braccio, avambraccio)
+        # 0° = braccio lungo il fianco, 90° = braccio orizzontale
+        elevazione = _angolo(braccio, np.tile(giu, (len(p3d), 1)))
+        # 1 = braccio teso, valori minori = mano vicina alla spalla
+        allungamento = np.linalg.norm(polso - spalla, axis=1) / (
+            np.linalg.norm(braccio, axis=1) + np.linalg.norm(avambraccio, axis=1) + 1e-9)
+        # metri di cui il polso sta davanti alla spalla (z più piccolo = più vicino alla webcam)
+        davanti = spalla[:, 2] - polso[:, 2]
+        for colonna, valori in ((f"gomito_{nome}", gomito_ang), (f"elevazione_{nome}", elevazione),
+                                (f"allungamento_{nome}", allungamento), (f"polso_davanti_{nome}", davanti)):
+            risultato[colonna] = np.where(ok, valori, np.nan)
+    # Busto: dal centro delle anche al centro delle spalle, rispetto alla verticale.
+    # Solo se le anche si vedono (alla scrivania spesso sono nascoste).
+    spalle = (_punto(p3d, "left_shoulder") + _punto(p3d, "right_shoulder")) / 2
+    anche = (_punto(p3d, "left_hip") + _punto(p3d, "right_hip")) / 2
+    ok = _visibili(p3d, posa, ["left_shoulder", "right_shoulder", "left_hip", "right_hip"])
+    risultato["busto"] = np.where(ok, _angolo(spalle - anche, np.tile(-giu, (len(p3d), 1))), np.nan)
+    return risultato
+
+
+def velocita_polsi_3d(p3d, posa=None):
+    """Velocità e accelerazione dei polsi in m/s e m/s², dopo aver smussato le posizioni
+    (la posa da webcam "trema" un po'). Non attraversa i salti tra fotogrammi."""
+    t = p3d["t_s"].to_numpy(dtype=float)
+    dt = np.diff(t, prepend=np.nan)
+    velocita, accelerazioni = [], []
+    for lato in ("left", "right"):
+        pos = pd.DataFrame(_punto(p3d, f"{lato}_wrist"))
+        pos.loc[~_visibili(p3d, posa, [f"{lato}_wrist"])] = np.nan
+        pos = pos.rolling(5, center=True, min_periods=3).median().rolling(5, center=True, min_periods=3).mean()
+        v = np.linalg.norm(pos.diff().to_numpy(), axis=1) / dt
+        v[dt > SOGLIA_PAUSA] = np.nan
+        a = np.abs(np.diff(v, prepend=np.nan)) / dt
+        velocita.append(v)
+        accelerazioni.append(a)
+    return np.nanmean(np.vstack(velocita), axis=0), np.nanmean(np.vstack(accelerazioni), axis=0)
+
+
+def misure_arti(p3d, posa=None):
+    if p3d is None or len(p3d) < 10:
+        return {}
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)  # medie di finestre vuote
+        angoli = angoli_arti(p3d, posa)
+        v, a = velocita_polsi_3d(p3d, posa)
+
+        def media(*colonne):
+            valori = np.nanmean(angoli[list(colonne)].to_numpy(), axis=1)
+            return arrotonda(np.nanmean(valori), 2) if np.isfinite(valori).any() else None
+
+        elevazione = np.nanmax(angoli[["elevazione_sx", "elevazione_dx"]].to_numpy(), axis=1)
+        gomiti = angoli[["gomito_sx", "gomito_dx"]]
+        return {
+            "gomito_angolo_medio": media("gomito_sx", "gomito_dx"),
+            "gomito_variab": arrotonda(np.nanmean(gomiti.std().to_numpy()), 2) if gomiti.notna().any().any() else None,
+            "braccio_elevazione_media": media("elevazione_sx", "elevazione_dx"),
+            "braccia_alzate_%": arrotonda(np.mean(elevazione[np.isfinite(elevazione)] > SOGLIA_BRACCIO_ALZATO) * 100, 1)
+            if np.isfinite(elevazione).any() else None,
+            "braccia_allungamento": media("allungamento_sx", "allungamento_dx"),
+            "polsi_davanti_m": media("polso_davanti_sx", "polso_davanti_dx"),
+            "busto_inclinazione": arrotonda(np.nanmean(angoli["busto"]), 1) if angoli["busto"].notna().any() else None,
+            "polsi_velocita_ms": arrotonda(np.nanmean(v)) if np.isfinite(v).any() else None,
+            "polsi_velocita_p95_ms": arrotonda(np.nanpercentile(v, 95)) if np.isfinite(v).any() else None,
+            "polsi_accelerazione_ms2": arrotonda(np.nanmean(a), 2) if np.isfinite(a).any() else None,
+        }
+
+
+# ---------------------------------------------------------------- orologio (polso) e battito
+
+def misure_orologio(orologio, frequenza=50):
+    """Misure del sensore al polso. Funzionano sia con lo smartwatch (Sensor Logger)
+    sia con il dataset di Yasar et al.: servono le colonne gyr_x/y/z (rad/s)
+    e acc_x/y/z (m/s², gravità compresa); lin_x/y/z (senza gravità) se ci sono."""
+    if orologio is None:
+        return {}
+    gyr = orologio[["gyr_x", "gyr_y", "gyr_z"]].to_numpy(dtype=float)
+    rotazione = np.linalg.norm(gyr, axis=1)
+    rotazione = rotazione[np.isfinite(rotazione)]
+    if len(rotazione) < frequenza * 2:
+        return {}
+    acc = np.linalg.norm(orologio[["acc_x", "acc_y", "acc_z"]].to_numpy(dtype=float), axis=1)
+    acc = acc[np.isfinite(acc)]
+    risultato = {
+        "polso_rotazione_media": arrotonda(np.sqrt(np.mean(rotazione ** 2))),
+        "polso_rotazione_p95": arrotonda(np.percentile(rotazione, 95)),
+        "polso_fermo_%": arrotonda(np.mean(rotazione < SOGLIA_POLSO_FERMO) * 100, 1),
+        "polso_acc_variab": arrotonda(acc.std()) if len(acc) > 1 else None,
+    }
+    if {"lin_x", "lin_y", "lin_z"} <= set(orologio.columns):
+        lin = np.linalg.norm(orologio[["lin_x", "lin_y", "lin_z"]].to_numpy(dtype=float), axis=1)
+        if np.isfinite(lin).any():
+            risultato["polso_acc_lineare_media"] = arrotonda(np.nanmean(lin))
+    return risultato
+
+
+def misure_battito(battito):
+    if battito is None:
+        return {}
+    bpm = battito["bpm"].dropna()
+    if len(bpm) < 3:
+        return {}
+    return {
+        "battito_medio": arrotonda(bpm.mean(), 1),
+        "battito_variab": arrotonda(bpm.std(), 2),
+        "battito_valido_%": arrotonda(battito["bpm"].notna().mean() * 100, 1),
     }
 
 
@@ -277,16 +426,20 @@ def misure_audio(livelli):
 
 def tutte_le_misure(sessione, inizio=None, fine=None):
     """Tutte le misure di una sessione, oppure solo dell'intervallo [inizio, fine)."""
+    chiavi = ("posa", "posa3d", "viso", "mani", "emozioni", "audio", "orologio", "battito")
     if inizio is None:
-        parti = {k: sessione[k] for k in ("posa", "viso", "mani", "emozioni", "audio")}
+        parti = {k: sessione.get(k) for k in chiavi}
     else:
-        parti = {k: taglia(sessione[k], inizio, fine) for k in ("posa", "viso", "mani", "emozioni", "audio")}
+        parti = {k: taglia(sessione.get(k), inizio, fine) for k in chiavi}
     fotogrammi = len(parti["posa"]) if parti["posa"] is not None else None
     risultato = {}
     risultato.update(misure_qualita(parti["posa"]))
     risultato.update(misure_corpo(parti["posa"], sessione["scala_spalle"]))
+    risultato.update(misure_arti(parti["posa3d"], parti["posa"]))
     risultato.update(misure_viso(parti["viso"]))
     risultato.update(misure_mani(parti["mani"], fotogrammi, sessione["scala_mani"]))
     risultato.update(misure_emozioni(parti["emozioni"]))
     risultato.update(misure_audio(parti["audio"]))
+    risultato.update(misure_orologio(parti["orologio"]))
+    risultato.update(misure_battito(parti["battito"]))
     return risultato

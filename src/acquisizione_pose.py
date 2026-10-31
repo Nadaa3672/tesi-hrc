@@ -1,7 +1,15 @@
 """Acquisizione della posa del corpo dalla webcam con MediaPipe.
 
 Per ogni fotogramma trova i 33 punti del corpo (spalle, gomiti, polsi, ...)
-e li salva in un file CSV, insieme al tempo trascorso dall'inizio.
+e li salva in due file CSV, insieme al tempo trascorso dall'inizio:
+  *_pose.csv    posizione nell'immagine (x, y da 0 a 1), profondità relativa z, visibilità
+  *_pose3d.csv  posizione nello spazio in METRI ("world landmarks" di MediaPipe),
+                con l'origine a metà tra le anche: x verso destra dell'immagine,
+                y verso il basso, z verso la webcam negativa (valori più piccoli =
+                più vicino alla webcam). È una stima da una sola telecamera:
+                utile per angoli e confronti, non per misure millimetriche.
+L'ora esatta di inizio (inizio_epoch_s in *_info.json) serve ad allineare
+altri dispositivi, per esempio lo smartwatch.
 Facoltativamente salva anche il video grezzo, per rielaborarlo in futuro
 (per esempio per estrarre il viso), e l'audio del microfono.
 
@@ -61,6 +69,23 @@ def intestazione_csv():
     return colonne
 
 
+def intestazione_csv_3d():
+    colonne = ["frame", "t_s"]
+    for nome in NOMI_PUNTI:
+        colonne += [f"{nome}_x", f"{nome}_y", f"{nome}_z"]
+    return colonne
+
+
+def riga_3d(frame, t_s, risultato):
+    """I 33 punti in metri, oppure None se MediaPipe non li ha restituiti."""
+    if not getattr(risultato, "pose_world_landmarks", None):
+        return None
+    riga = [frame, round(t_s, 4)]
+    for p in risultato.pose_world_landmarks[0]:
+        riga += [round(p.x, 4), round(p.y, 4), round(p.z, 4)]
+    return riga
+
+
 def disegna_scheletro(immagine, punti):
     """Disegna linee e punti del corpo sull'immagine (in pixel)."""
     altezza, larghezza = immagine.shape[:2]
@@ -107,7 +132,10 @@ def main():
     frame_con_persona = 0
     eventi = []  # tempi (in secondi) in cui hai premuto SPAZIO
     ultimo_ms = -1
+    # Due orologi letti nello stesso istante: perf_counter per misurare il tempo
+    # trascorso (preciso), time.time per l'ora esatta (serve ad allineare lo smartwatch)
     inizio = time.perf_counter()
+    inizio_epoch = time.time()
 
     microfono = None
     if args.audio:
@@ -115,9 +143,12 @@ def main():
         microfono.avvia()
 
     with vision.PoseLandmarker.create_from_options(opzioni) as rilevatore, \
-            open(str(base) + "_pose.csv", "w", newline="") as file_csv:
+            open(str(base) + "_pose.csv", "w", newline="") as file_csv, \
+            open(str(base) + "_pose3d.csv", "w", newline="") as file_3d:
         scrittore = csv.writer(file_csv)
         scrittore.writerow(intestazione_csv())
+        scrittore_3d = csv.writer(file_3d)
+        scrittore_3d.writerow(intestazione_csv_3d())
 
         print("Registrazione avviata. SPAZIO = segna un evento, Q = ferma.")
         while True:
@@ -146,6 +177,9 @@ def main():
                 for p in punti:
                     riga += [round(p.x, 5), round(p.y, 5), round(p.z, 5), round(p.visibility, 3)]
                 scrittore.writerow(riga)
+                riga3d = riga_3d(frame, t_s, risultato)
+                if riga3d is not None:
+                    scrittore_3d.writerow(riga3d)
                 frame_con_persona += 1
                 disegna_scheletro(immagine, punti)
 
@@ -185,6 +219,7 @@ def main():
         "sessione": args.sessione,
         "note": args.note,
         "inizio": timbro,
+        "inizio_epoch_s": round(inizio_epoch, 3),
         "durata_s": round(durata, 1),
         "frame_totali": frame,
         "frame_con_persona": frame_con_persona,

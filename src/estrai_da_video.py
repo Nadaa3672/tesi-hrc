@@ -12,6 +12,9 @@ Per ogni video crea, accanto al video, i file della sessione:
   *_pose.csv  i 33 punti del corpo, SOLO se non esiste già. Serve per i video che
               non vengono dal nostro script di acquisizione (per esempio quelli
               di un dataset pubblico).
+  *_pose3d.csv i 33 punti del corpo in METRI (profondità compresa), se non esiste già.
+              Così anche le registrazioni fatte con le versioni precedenti
+              ottengono la profondità.
 
 Il tempo t_s di ogni fotogramma viene preso dal file *_pose.csv della stessa
 sessione se esiste (così tutti i segnali stanno sullo stesso orologio),
@@ -26,6 +29,7 @@ import argparse
 import csv
 import glob
 import math
+import os
 from pathlib import Path
 
 import cv2
@@ -122,11 +126,29 @@ def riga_posa(frame, t_s, risultato):
     return riga
 
 
+def riga_posa_3d(frame, t_s, risultato):
+    """I 33 punti in metri ("world landmarks"), oppure None."""
+    if not getattr(risultato, "pose_world_landmarks", None):
+        return None
+    riga = [frame, t_s]
+    for p in risultato.pose_world_landmarks[0]:
+        riga += [round(p.x, 4), round(p.y, 4), round(p.z, 4)]
+    return riga
+
+
+def parziale(nome):
+    """Nome temporaneo: si scrive qui e si rinomina solo alla fine. Così, se il PC
+    si spegne a metà, non resta un file incompleto con il nome di quello vero."""
+    return nome + ".parziale"
+
+
 def elabora(video):
     video = Path(video)
     base = str(base_video(video))
     tempi = tempi_dalla_posa(video)
-    con_posa = not tempi  # la posa la estraiamo solo se non c'è già
+    scrivi_posa_2d = not tempi  # la posa la scriviamo solo se non c'è già
+    scrivi_posa_3d = not Path(base + "_pose3d.csv").exists()
+    con_posa = scrivi_posa_2d or scrivi_posa_3d
     filmato = cv2.VideoCapture(str(video))
     if not filmato.isOpened():
         print(f"{video.name}: non riesco ad aprire il video, lo salto.")
@@ -135,20 +157,30 @@ def elabora(video):
     totale = int(filmato.get(cv2.CAP_PROP_FRAME_COUNT))
 
     rilevatore_viso, rilevatore_mani, rilevatore_posa = crea_rilevatori(con_posa)
-    f_posa = open(base + "_pose.csv", "w", newline="") if con_posa else None
+    finali = [base + "_viso.csv", base + "_mani.csv"]
+    if scrivi_posa_2d:
+        finali.append(base + "_pose.csv")
+    if scrivi_posa_3d:
+        finali.append(base + "_pose3d.csv")
+    f_posa = open(parziale(base + "_pose.csv"), "w", newline="") if scrivi_posa_2d else None
+    f_posa_3d = open(parziale(base + "_pose3d.csv"), "w", newline="") if scrivi_posa_3d else None
     try:
         with rilevatore_viso, rilevatore_mani, \
-                open(base + "_viso.csv", "w", newline="") as f_viso, \
-                open(base + "_mani.csv", "w", newline="") as f_mani:
+                open(parziale(base + "_viso.csv"), "w", newline="") as f_viso, \
+                open(parziale(base + "_mani.csv"), "w", newline="") as f_mani:
             scrivi_viso, scrivi_mani = csv.writer(f_viso), csv.writer(f_mani)
             intestazione_viso_scritta = False
             scrivi_mani.writerow(["frame", "t_s", "mano", "sicurezza"]
                                  + [f"p{i}_{a}" for i in range(21) for a in "xyz"])
-            scrivi_posa = None
-            if con_posa:
+            scrivi_posa = scrivi_posa_3d_csv = None
+            if scrivi_posa_2d:
                 scrivi_posa = csv.writer(f_posa)
                 scrivi_posa.writerow(["frame", "t_s"] + [f"{n}_{a}" for n in NOMI_PUNTI
                                                          for a in ("x", "y", "z", "vis")])
+            if scrivi_posa_3d:
+                scrivi_posa_3d_csv = csv.writer(f_posa_3d)
+                scrivi_posa_3d_csv.writerow(["frame", "t_s"] + [f"{n}_{a}" for n in NOMI_PUNTI
+                                                                for a in ("x", "y", "z")])
 
             frame, ultimo_ms, con_viso, con_mani, con_corpo = 0, -1, 0, 0, 0
             while True:
@@ -175,24 +207,35 @@ def elabora(video):
                 con_mani += bool(righe)
 
                 if con_posa:
-                    riga = riga_posa(frame, t_s, rilevatore_posa.detect_for_video(mp_img, ms))
+                    risultato_posa = rilevatore_posa.detect_for_video(mp_img, ms)
+                    riga = riga_posa(frame, t_s, risultato_posa)
                     if riga is not None:
-                        scrivi_posa.writerow(riga)
                         con_corpo += 1
+                        if scrivi_posa_2d:
+                            scrivi_posa.writerow(riga)
+                    riga3d = riga_posa_3d(frame, t_s, risultato_posa)
+                    if riga3d is not None and scrivi_posa_3d:
+                        scrivi_posa_3d_csv.writerow(riga3d)
 
                 frame += 1
                 if frame % 300 == 0:
                     print(f"  {video.name}: {frame}/{totale} fotogrammi")
     finally:
-        if f_posa is not None:
-            f_posa.close()
+        for f in (f_posa, f_posa_3d):
+            if f is not None:
+                f.close()
         if rilevatore_posa is not None:
             rilevatore_posa.close()
         filmato.release()
 
+    # Arrivati qui l'elaborazione è finita: i file temporanei diventano quelli veri
+    for nome in finali:
+        os.replace(parziale(nome), nome)
+
     messaggio = f"{video.name}: viso in {con_viso}/{frame} fotogrammi, mani in {con_mani}/{frame}"
     if con_posa:
-        messaggio += f", corpo in {con_corpo}/{frame} (posa estratta dal video)"
+        cosa = "posa e profondità" if scrivi_posa_2d else "profondità"
+        messaggio += f", corpo in {con_corpo}/{frame} ({cosa} estratte dal video)"
     print(messaggio + ".")
 
 

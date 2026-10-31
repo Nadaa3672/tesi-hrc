@@ -2,6 +2,77 @@
 
 Le decisioni di progetto più importanti, con il motivo. Le voci più recenti sono in alto.
 
+## 31 ottobre 2026 – v6.3: allineamento concentrato sulla scossa
+
+- Terza prova webcam + orologio (30,6 s): orologio completo (copre il 100% della webcam, battito 71–85 bpm),
+  misure degli arti plausibili (gomito ~102°, braccia a ~41°, polsi ~31 cm davanti alle spalle,
+  busto non calcolabile perché le anche non si vedono). Ma l'allineamento fine falliva.
+- Causa, vista sui dati veri: il polso si vedeva solo dal 2° al 20° secondo (meno dei 20 s richiesti), e
+  confrontando tutta la registrazione la webcam vede spostamenti del polso che l'orologio (che misura
+  rotazioni) non vede allo stesso modo: una ricerca su ±5 s dava anche un falso risultato al limite (−5,00 s).
+- Correzione: l'orologio trova da solo la scossa (picco di rotazione nei primi 120 s) e il confronto si fa solo
+  su quel tratto ±3 s; la velocità del polso nel video viene ripulita con una mediana mobile; uno sfasamento al
+  limite dell'intervallo di ricerca viene scartato come inaffidabile.
+- Risultato sulla prova vera: scossa trovata tra 13,05 e 14,23 s, polso destro, sfasamento +0,06 s
+  (orologi di PC e telefono quasi coincidenti), correlazione 0,64. Sui dati sintetici: −0,40 / −1,20 / +2,30 s
+  ritrovati esattamente (correlazione 0,96).
+
+## 31 ottobre 2026 – v6.2: controlli sui dati dell'orologio
+
+- Seconda prova webcam + orologio: la webcam ha registrato 57 s, ma l'orologio ha inviato dati solo
+  dal secondo 40 al 46,6 (battito sempre 0). Le scosse (secondo 36) erano quindi fuori dai dati, eppure
+  l'allineamento aveva restituito un risultato (−0,30 s, correlazione 0,67) calcolato su 6,6 s di dati: non affidabile.
+- Ora `importa_orologio.py` controlla: (1) quanta parte della registrazione webcam è coperta dall'orologio
+  (avviso sotto il 90%); (2) che nei dati dell'orologio ci sia davvero una scossa (rotazione > 3 rad/s);
+  (3) almeno 20 s di dati in comune per l'allineamento fine. Altrimenti usa solo l'ora esatta e lo dice.
+- Protocollo aggiornato: aprire Sensor Logger sull'orologio, aspettare che mostri il battito prima di avviare
+  la webcam, alla fine aspettare qualche secondo prima di fermare e prima di esportare.
+- Mattina e sera del 18/10 rielaborate con `--forza` (dopo l'interruzione): completate senza errori.
+- Nota: muovere la webcam durante la registrazione cambia la "verticale" vista da MediaPipe e quindi
+  gli angoli delle braccia e del busto: la webcam deve restare ferma per tutta la sessione.
+
+## 31 ottobre 2026 – v6.1: file al sicuro dalle interruzioni
+
+- Un'elaborazione interrotta (PC chiuso durante `elabora.py`) poteva lasciare file incompleti con il nome
+  di quelli veri; alla ripresa venivano considerati "già presenti". Ora `estrai_da_video.py` ed
+  `estrai_emozioni.py` scrivono in file `*.parziale` e li rinominano solo a lavoro finito.
+  Provato simulando uno spegnimento a metà: restano solo i `.parziale`, e la ripresa rifà tutto.
+- Le sessioni elaborate durante l'interruzione (mattina e sera del 18/10) vanno rifatte con `--forza`.
+- Registrazione di prova webcam + orologio del 31/10: la profondità salvata in diretta funziona
+  (`_pose3d.csv` presente, non ricalcolata). Lo zip di Sensor Logger conteneva solo i metadati, senza i dati
+  dell'orologio (probabilmente esportato prima che l'orologio finisse di inviarli): messaggio d'errore più chiaro.
+
+## 30 ottobre 2026 (sera) – v6: profondità, arti, smartwatch, dataset di Yasar
+
+- **Dataset scelti** (dopo una ricerca: non esiste un dataset con corpo, fatica e stessa persona nel tempo):
+  - dati propri da casa con fatica reale (webcam + smartwatch): dati principali;
+  - **Yasar et al., Scientific Data 2024** (WSD4FEDSRM, Zenodo, CC BY 4.0): 34 persone, rotazioni della spalla
+    fino allo sfinimento, sensori di movimento su mano/avambraccio/braccio, Borg ogni 10 s → per sviluppare
+    l'analisi temporale sul sensore al polso;
+  - OperatorEYEVP (Sensors 2023): link non più attivi, chiesti i dati agli autori.
+- **Profondità**: si salvano i "world landmarks" di MediaPipe (`*_pose3d.csv`, metri, origine tra le anche).
+  Motivo: angoli e velocità reali degli arti; nessuna libreria in più. Stima da una sola telecamera, quindi
+  meno precisa di una camera RGB-D: va bene per confrontare la stessa persona nel tempo.
+  Le sessioni vecchie la ottengono rielaborando il video (`elabora.py`).
+- **Misure degli arti**: angolo dei gomiti e sua variabilità, elevazione delle braccia, % braccia alzate (> 45°),
+  allungamento delle braccia, quanto i polsi stanno davanti alle spalle, inclinazione del busto (solo se le anche
+  si vedono), velocità e variazione di velocità dei polsi in m/s.
+- **Smartwatch**: Galaxy Watch4 + app **Sensor Logger** (Android/Wear OS). Prove del 30/10:
+  - 1ª prova: buchi fino a 8 s e battito sempre 0 → risolti con batteria "senza restrizioni", permesso
+    "sensori del corpo", cinturino aderente;
+  - 2ª prova (93 s): dati presenti ~100%, battito valido dal 9° secondo (76–77 bpm a riposo, ~90 in attività).
+  - I campioni arrivano ~80 al secondo e non regolari → ricampionati a **50 Hz**; battito 0 = dato mancante.
+- **Allineamento orologio–video** (`importa_orologio.py`): (1) con l'ora esatta (nuovo `inizio_epoch_s` in
+  `*_info.json`); (2) con le scosse del polso, confrontando la velocità del polso vista da MediaPipe con la
+  rotazione misurata dall'orologio. Provato su dati sintetici costruiti dalla registrazione vera: sfasamenti
+  di −0,40 s, −1,20 s e +2,30 s ritrovati esattamente (correlazione 0,94).
+- **Stesse misure per orologio e Yasar** (`misure_orologio`): rotazione media e 95° percentile, % polso fermo,
+  variabilità dell'accelerazione. Il "ritmo" (frequenza dominante) è stato tolto: su Yasar non cambiava con
+  la fatica e nelle prove a scrivania non era stabile.
+- **Risultato su Yasar** (avambraccio, finestre di 10 s, 34 persone, 203 prove, Borg mediano 9 → 19):
+  rotazione media −13,5% (rho con Borg −0,52, concorde nel 76% delle prove); picchi −18,1% (rho −0,45).
+  Limite: fatica e tempo crescono insieme, quindi questo non basta a separarli.
+
 ## 30 ottobre 2026 – Verifica dell'orientamento della testa
 
 - Prova 1 (muovendo solo gli occhi): `testa_pitch` quasi fermo (tra 1° e 5°).
