@@ -2,6 +2,17 @@
 
 Le decisioni di progetto più importanti, con il motivo. Le voci più recenti sono in alto.
 
+## 4 novembre 2026 – Protocollo dello studio pilota (prima dei dati)
+
+- Obiettivo di laurea: sessione di dicembre 2026 (consegna della tesi entro il 4 dicembre, sedute 15–18 dicembre).
+- Scritto `PROTOCOLLO.md` PRIMA di raccogliere i dati: condizioni A (esercizio braccia) e B (riposo) con la
+  stessa durata, 6 + 6 sessioni in 6 giorni (due al giorno, ordine alternato), misura principale e test
+  decisi in anticipo (variazione dopo − prima della velocità dei polsi, Mann–Whitney A contro B).
+- Motivo del 6 + 6: con 3 + 3 il valore p più basso possibile del Mann–Whitney è 0,10 (mai significativo);
+  con 5 + 5 è circa 0,008, con 6 + 6 circa 0,002.
+- Esercizio a durata fissa con obiettivo Borg ≥ 14–15 (controllo della manipolazione); SPAZIO a ogni giro
+  del compito per avere anche una misura oggettiva di prestazione (tempo per giro).
+
 ## 2 novembre 2026 – v7: analisi temporale (prima versione) e risultati su Yasar
 
 - In attesa dei tool del prof, scelti strumenti diffusi e già pronti: **scikit-learn** (machine learning,

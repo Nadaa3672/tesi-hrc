@@ -1,0 +1,3 @@
+giorno,data,momento,condizione,sessione_pre,sessione_post,borg_inizio,kss_inizio,borg_dopo_compito1,kss_dopo_compito1,borg_dopo_meta,kss_dopo_meta,borg_fine,kss_fine,bottiglie_litri,note
+1,2026-11-05,mattina,A,,,,,,,,,,,0.5,
+1,2026-11-05,pomeriggio,B,,,,,,,,,,,,
