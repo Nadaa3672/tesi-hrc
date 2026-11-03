@@ -27,7 +27,8 @@ tesi-hrc/
 │   ├── analisi_sessione.py    riepilogo di sessioni intere + grafico di confronto
 │   ├── analisi_finestre.py    misure ogni N secondi -> "tabella delle finestre"
 │   ├── elabora.py             comando unico: esegue i passaggi che mancano su uno o più video
-│   └── yasar.py               dataset di Yasar et al. -> tabella delle finestre con la fatica (Borg)
+│   ├── yasar.py               dataset di Yasar et al. -> tabella delle finestre con la fatica (Borg)
+│   └── analisi_temporale.py   la stessa persona prima e dopo: classificazione e punti di cambiamento
 ├── data/                      registrazioni (non vanno su Git)
 └── models/                    modelli scaricati (non vanno su Git)
 ```
@@ -137,6 +138,28 @@ quanto ogni misura segue la fatica nella stessa persona. Da citare: Yasar M.N. e
 fatigue estimation during shoulder internal and external rotation movements using wearables",
 Scientific Data (2024), doi:10.1038/s41597-024-03254-8.
 
+### 6. Analisi temporale (la stessa persona prima e dopo)
+
+Parte da una tabella delle finestre e usa librerie già pronte: **scikit-learn** (modelli di machine
+learning), **ruptures** (punti di cambiamento) e **pycatch22** (22 caratteristiche standard delle serie
+temporali, Lubba et al. 2019).
+
+```
+python src/yasar.py C:\percorso\WSD4FEDSRM --catch22 --cambiamento
+python src/analisi_temporale.py data/yasar_finestre.csv --etichetta borg --soglie 12 17
+python src/analisi_temporale.py data/finestre.csv --etichetta etichetta --base persona --riferimento riposata --gruppi sessione --cambiamenti
+```
+
+- **Classificazione**: riconoscere 2 o 3 stati (es. Borg fino a 12 = poco affaticata, da 17 = molto).
+  I modelli sono valutati su persone mai viste ("leave-one-subject-out"; con una sola persona
+  `--gruppi sessione` tiene fuori una sessione alla volta). Confronta: solo il tempo trascorso, le misure,
+  le misure **relative alla linea di base della persona** (`_rel`), catch22. Risultati in `*_classificazione.csv`.
+- **Linea di base**: `--base sequenza` = le prime finestre della stessa registrazione;
+  `--base persona --riferimento riposata` = le prime finestre della prima sessione "riposata" della persona
+  (una calibrazione fatta una volta). Le finestre di calibrazione non entrano nella valutazione.
+- **Cambiamenti** (`--cambiamenti`): per ogni registrazione, il momento in cui le misure cambiano di più
+  rispetto all'inizio e quale misura cambia di più. Pensato per sessioni lunghe.
+
 ## Le misure
 
 | Gruppo | Misure |
@@ -151,6 +174,7 @@ Scientific Data (2024), doi:10.1038/s41597-024-03254-8.
 | Audio | silenzio digitale %, rumore di fondo, livello medio, picco, % suoni sopra il fondo |
 | Polso (orologio) | rotazione media e 95° percentile (rad/s), % polso fermo, variabilità dell'accelerazione, accelerazione senza gravità |
 | Battito | battito medio e variabilità, % letture valide |
+| catch22 (facoltative) | 22 caratteristiche standard della rotazione del polso (`--catch22`), colonne `c22_*` |
 
 Le distanze del corpo nell'immagine sono divise per la larghezza delle spalle, quelle delle mani per la
 grandezza della mano: così non dipendono dalla distanza dalla webcam. Le misure degli arti usano

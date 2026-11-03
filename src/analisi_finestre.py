@@ -33,7 +33,7 @@ import misure
 COPERTURA_MINIMA = 50  # % minima di fotogrammi con la persona visibile
 
 
-def finestre_di_una_sessione(base, persona, etichetta, durata, passo):
+def finestre_di_una_sessione(base, persona, etichetta, durata, passo, con_catch22=False):
     sessione = misure.carica_sessione(base)
     # Il tempo di riferimento: la webcam se c'è, altrimenti solo l'orologio
     riferimento = next((sessione[k] for k in ("posa", "viso", "orologio") if sessione[k] is not None), None)
@@ -64,7 +64,7 @@ def finestre_di_una_sessione(base, persona, etichetta, durata, passo):
             "fine_s": round(float(fine - inizio_sessione), 2),
             "copertura_%": round(copertura, 1),
         }
-        riga.update(misure.tutte_le_misure(sessione, inizio, fine))
+        riga.update(misure.tutte_le_misure(sessione, inizio, fine, con_catch22))
         righe.append(riga)
 
     print(f"  {sessione['nome']}: {len(righe)} finestre"
@@ -99,12 +99,14 @@ def main():
     parser.add_argument("--finestra", type=float, default=30, help="Durata di una finestra in secondi")
     parser.add_argument("--passo", type=float, default=None, help="Distanza tra l'inizio di due finestre")
     parser.add_argument("--uscita", default="data/finestre.csv", help="File CSV di uscita")
+    parser.add_argument("--catch22", action="store_true",
+                        help="Aggiunge le 22 caratteristiche catch22 della rotazione del polso (serve l'orologio)")
     args = parser.parse_args()
 
     passo = args.passo or args.finestra
     righe = []
     for base, persona, etichetta in leggi_elenco(args):
-        righe += finestre_di_una_sessione(base, persona, etichetta, args.finestra, passo)
+        righe += finestre_di_una_sessione(base, persona, etichetta, args.finestra, passo, args.catch22)
 
     if not righe:
         raise SystemExit("Nessuna finestra calcolata.")

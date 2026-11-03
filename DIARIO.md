@@ -2,6 +2,30 @@
 
 Le decisioni di progetto più importanti, con il motivo. Le voci più recenti sono in alto.
 
+## 2 novembre 2026 – v7: analisi temporale (prima versione) e risultati su Yasar
+
+- In attesa dei tool del prof, scelti strumenti diffusi e già pronti: **scikit-learn** (machine learning,
+  valutazione leave-one-subject-out), **ruptures** (punti di cambiamento, Truong et al. 2020), **pycatch22**
+  (22 caratteristiche standard per serie temporali, Lubba et al. 2019). Sono intercambiabili: se il prof
+  indica altri tool, cambia solo `analisi_temporale.py`.
+- Nuovo `analisi_temporale.py`: classificazione di 2–3 stati con confronto onesto contro il **solo tempo
+  trascorso**; misure "relative" alla linea di base della stessa persona; punti di cambiamento per sessione.
+- **Risultati su Yasar** (avambraccio, finestre 10 s, 34 persone, 2 classi Borg ≤12 / ≥17, 907 finestre,
+  accuratezza bilanciata su persone mai viste, random forest):
+  - solo tempo **0,91**; misure 0,59; misure relative 0,68; catch22 0,62; catch22 relative 0,70;
+    misure + catch22 relative **0,71**; tutto relativo + tempo 0,90.
+  - Con 3 classi: solo tempo 0,65; migliore senza tempo 0,50 (caso 0,33).
+- Cosa significano:
+  1. Riferire le misure alla **linea di base della stessa persona** migliora il riconoscimento su persone
+     nuove di circa 9–10 punti (0,59 → 0,68; 0,62 → 0,70): sostiene l'idea del "prima e dopo".
+  2. Ma in questo protocollo la fatica cresce insieme al tempo (ogni prova va da riposato a Borg 20, in genere in 1–2 minuti):
+     **il tempo da solo basta** e il movimento non aggiunge informazione (anche a parità di tempo la
+     correlazione tra misure e Borg è debole, |rho| ≤ 0,2).
+  3. Il rilevamento automatico del momento della fatica (Borg ≥ 15) sbaglia di 20 s in mediana, peggio che
+     indovinare sempre 40 s (10 s): su prove così brevi e graduali non funziona.
+- Conseguenza per i dati propri: serve un protocollo in cui **tempo e fatica non vadano insieme**
+  (stessa durata con e senza un compito che stanca; pause), altrimenti qualunque modello impara l'orologio.
+
 ## 31 ottobre 2026 – v6.3: allineamento concentrato sulla scossa
 
 - Terza prova webcam + orologio (30,6 s): orologio completo (copre il 100% della webcam, battito 71–85 bpm),
@@ -16,6 +40,8 @@ Le decisioni di progetto più importanti, con il motivo. Le voci più recenti so
 - Risultato sulla prova vera: scossa trovata tra 13,05 e 14,23 s, polso destro, sfasamento +0,06 s
   (orologi di PC e telefono quasi coincidenti), correlazione 0,64. Sui dati sintetici: −0,40 / −1,20 / +2,30 s
   ritrovati esattamente (correlazione 0,96).
+- Confermato da Nada: l'orologio è davvero sul polso destro (il programma lo ha riconosciuto solo dai dati).
+  Stesso risultato sul PC di Nada.
 
 ## 31 ottobre 2026 – v6.2: controlli sui dati dell'orologio
 

@@ -70,7 +70,7 @@ def leggi_sensore(radice, cartella, soggetto, sensore):
     return dati
 
 
-def finestre(radice, sensore, durata):
+def finestre(radice, sensore, durata, con_catch22=False):
     borg = leggi_borg(radice)
     righe, scartate = [], []
     for _, r in borg.iterrows():
@@ -89,7 +89,10 @@ def finestre(radice, sensore, durata):
             riga = {"persona": f"S{soggetto:02d}", "esercizio": r["task_order"], "tipo": tipo,
                     "carico": carico, "finestra": k, "inizio_s": inizio, "fine_s": fine,
                     "borg": float(r[colonna]), "progresso": round(fine / durata_prova, 3)}
-            riga.update(misure.misure_orologio(misure.taglia(dati, inizio, fine), FREQUENZA))
+            parte = misure.taglia(dati, inizio, fine)
+            riga.update(misure.misure_orologio(parte, FREQUENZA))
+            if con_catch22:
+                riga.update(misure.caratteristiche_catch22(parte))
             righe.append(riga)
     if scartate:
         print(f"Prove scartate perché la durata dei dati non coincide con quella dichiarata: {', '.join(scartate)}")
@@ -120,6 +123,45 @@ def riassunto(tabella):
           "(negativa: la misura cala quando la fatica sale).")
 
 
+def valuta_cambiamento(radice, sensore, soglia_borg=15, passo=2.0):
+    """Il rilevamento automatico del cambiamento trova il momento della fatica?
+    Per ogni prova: misure del polso ogni `passo` secondi, confrontate con i primi 10 s;
+    un punto di cambiamento (ruptures, Binseg); lo si confronta con il primo momento
+    in cui la persona dichiara Borg >= soglia_borg. Come termine di paragone:
+    indovinare sempre lo stesso istante (la mediana di tutte le prove)."""
+    import ruptures as rpt
+    borg = leggi_borg(radice)
+    righe = []
+    for _, r in borg.iterrows():
+        soggetto = int(str(r["subject"]).split("_")[1])
+        cartella, tipo, carico = ESERCIZI[r["task_order"]]
+        dati = leggi_sensore(radice, cartella, soggetto, sensore)
+        durata = float(r["length_of_trial_(sec)"])
+        if abs(dati["t_s"].iloc[-1] - durata) > DIFFERENZA_MASSIMA_S or durata < 40:
+            continue
+        tempi = [k * 10 for k in range(1, 26) if f"{k * 10}_sec" in borg.columns and pd.notna(r[f"{k * 10}_sec"])]
+        sopra = [t for t in tempi if r[f"{t}_sec"] >= soglia_borg]
+        if not sopra:
+            continue
+        valori = []
+        for inizio in np.arange(0, durata - passo + 1e-9, passo):
+            m = misure.misure_orologio(misure.taglia(dati, inizio, inizio + passo), FREQUENZA)
+            valori.append([m.get("polso_rotazione_media"), m.get("polso_rotazione_p95"), m.get("polso_acc_variab")])
+        X = np.array(valori, dtype=float)
+        X = np.nan_to_num((X - np.nanmean(X[:int(10 / passo)], axis=0)) / (np.nanstd(X, axis=0) + 1e-9))
+        cambio = rpt.Binseg(model="l2", min_size=3).fit(X).predict(n_bkps=1)[0] * passo
+        righe.append({"persona": f"S{soggetto:02d}", "esercizio": r["task_order"], "durata_s": durata,
+                      "cambio_s": cambio, f"borg{soglia_borg}_s": sopra[0]})
+    tabella = pd.DataFrame(righe)
+    vero = tabella[f"borg{soglia_borg}_s"]
+    costante = vero.median()
+    print(f"\nRilevamento del cambiamento su {len(tabella)} prove (momento in cui il Borg arriva a {soglia_borg}):")
+    print(f"  errore mediano del rilevamento automatico:         {(tabella['cambio_s'] - vero).abs().median():.1f} s")
+    print(f"  errore mediano indovinando sempre {costante:.0f} s (mediana): {(costante - vero).abs().median():.1f} s")
+    print(f"  correlazione tra momento trovato e momento vero:   {np.corrcoef(tabella['cambio_s'], vero)[0, 1]:.2f}")
+    return tabella
+
+
 def main():
     parser = argparse.ArgumentParser(description="Dataset di Yasar et al. nel formato del framework.")
     parser.add_argument("cartella", help="Cartella WSD4FEDSRM estratta dallo zip")
@@ -127,6 +169,9 @@ def main():
     parser.add_argument("--finestra", type=int, default=10, choices=[10, 20, 30],
                         help="Durata delle finestre in secondi (multiplo di 10, come il Borg)")
     parser.add_argument("--uscita", default="data/yasar_finestre.csv", help="File CSV di uscita")
+    parser.add_argument("--catch22", action="store_true", help="Aggiunge le 22 caratteristiche catch22")
+    parser.add_argument("--cambiamento", action="store_true",
+                        help="Valuta anche il rilevamento automatico del momento della fatica (ruptures)")
     args = parser.parse_args()
 
     radice = Path(args.cartella)
@@ -137,11 +182,16 @@ def main():
         else:
             raise SystemExit("Non trovo la cartella 'Borg data': indica la cartella WSD4FEDSRM estratta dallo zip.")
 
-    tabella = finestre(radice, args.sensore, args.finestra)
+    tabella = finestre(radice, args.sensore, args.finestra, args.catch22)
     Path(args.uscita).parent.mkdir(parents=True, exist_ok=True)
     tabella.to_csv(args.uscita, index=False)
     print(f"Sensore: {args.sensore}. Tabella -> {args.uscita}")
     riassunto(tabella)
+    if args.cambiamento:
+        cambi = valuta_cambiamento(radice, args.sensore)
+        uscita = Path(args.uscita).with_name(Path(args.uscita).stem + "_cambiamento.csv")
+        cambi.to_csv(uscita, index=False)
+        print(f"  dettaglio -> {uscita}")
 
 
 if __name__ == "__main__":

@@ -6,3 +6,6 @@ scipy
 matplotlib
 sounddevice
 emotiefflib
+scikit-learn
+ruptures
+pycatch22

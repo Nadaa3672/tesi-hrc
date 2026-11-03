@@ -269,6 +269,29 @@ def misure_orologio(orologio, frequenza=50):
     return risultato
 
 
+def caratteristiche_catch22(orologio):
+    """Le 22 caratteristiche "catch22" (Lubba et al., 2019) della rotazione del polso.
+
+    catch22 è un insieme standard di 22 misure per serie temporali, scelte tra
+    oltre 7000 perché descrivono bene forma, ritmo e regolarità di un segnale.
+    Le usiamo accanto alle nostre misure "fatte a mano", che sono poche e
+    interpretabili: così possiamo vedere se una descrizione generica e già
+    pronta coglie qualcosa in più. Richiede la libreria pycatch22.
+    Le colonne iniziano con c22_ (es. c22_CO_f1ecac)."""
+    if orologio is None:
+        return {}
+    try:
+        import pycatch22
+    except ImportError:
+        return {}
+    rotazione = np.linalg.norm(orologio[["gyr_x", "gyr_y", "gyr_z"]].to_numpy(dtype=float), axis=1)
+    rotazione = rotazione[np.isfinite(rotazione)]
+    if len(rotazione) < 20:
+        return {}
+    risultato = pycatch22.catch22_all(rotazione.tolist())
+    return {f"c22_{nome}": arrotonda(valore, 5) for nome, valore in zip(risultato["names"], risultato["values"])}
+
+
 def misure_battito(battito):
     if battito is None:
         return {}
@@ -424,8 +447,9 @@ def misure_audio(livelli):
 
 # ---------------------------------------------------------------- tutto insieme
 
-def tutte_le_misure(sessione, inizio=None, fine=None):
-    """Tutte le misure di una sessione, oppure solo dell'intervallo [inizio, fine)."""
+def tutte_le_misure(sessione, inizio=None, fine=None, con_catch22=False):
+    """Tutte le misure di una sessione, oppure solo dell'intervallo [inizio, fine).
+    Con con_catch22=True aggiunge le 22 caratteristiche catch22 della rotazione del polso."""
     chiavi = ("posa", "posa3d", "viso", "mani", "emozioni", "audio", "orologio", "battito")
     if inizio is None:
         parti = {k: sessione.get(k) for k in chiavi}
@@ -442,4 +466,6 @@ def tutte_le_misure(sessione, inizio=None, fine=None):
     risultato.update(misure_audio(parti["audio"]))
     risultato.update(misure_orologio(parti["orologio"]))
     risultato.update(misure_battito(parti["battito"]))
+    if con_catch22:
+        risultato.update(caratteristiche_catch22(parti["orologio"]))
     return risultato
