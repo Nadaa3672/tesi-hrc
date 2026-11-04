@@ -1,6 +1,6 @@
 # Protocollo dello studio pilota (scritto PRIMA di raccogliere i dati)
 
-Versione 2 – 4 novembre 2026 (prima di raccogliere i dati). Ogni modifica va annotata in fondo, con data e motivo.
+Versione 3 – 4 novembre 2026 (prima di raccogliere i dati). Ogni modifica va annotata in fondo, con data e motivo.
 
 ## Obiettivo
 
@@ -20,13 +20,14 @@ su dati reali. I risultati non sono generalizzabili ad altre persone.
 | In mezzo | 5 min | esercizio braccia | riposo seduta | solo orologio |
 | Dopo | 5 min | compito standard | compito standard | webcam (`--sessione s<n><A/B>_post --video`) + orologio |
 
-- **Compito standard**: spostare 40 piccoli oggetti, uno alla volta, dal contenitore di sinistra a quello
-  di destra e poi di nuovo a sinistra ("un giro" = 40 spostamenti), ripetendo i giri fino a 5 minuti.
-  Stessi oggetti, stessi contenitori, stessa posizione sulla scrivania ogni volta.
-- **Esercizio (solo A)**: 5 minuti esatti con due bottiglie d'acqua, alternando 30 s di alzate laterali e 30 s
-  di alzate frontali fino all'altezza delle spalle, a ritmo costante. **Obiettivo: Borg 14–16 alla fine.**
-  Il peso (0,5 o 1 L) e il ritmo si scelgono UNA volta, nella taratura prima della prima sessione, e poi non
-  si cambiano più. Ci si ferma subito in caso di dolore (non è un allenamento).
+- **Compito standard**: spostare 20 piccoli oggetti, uno alla volta, dal foglio di sinistra a quello di destra
+  (due fogli davanti al PC, dentro l'inquadratura) e poi di nuovo a sinistra ("un giro" = 20 spostamenti),
+  ripetendo i giri fino a 5 minuti. Stessi oggetti, stessi fogli, stessa posizione ogni volta (segnata con lo scotch).
+- **Esercizio (solo A)**: in piedi, 5 minuti esatti con due bottiglie da 1,5 L riempite a **0,5 L** ciascuna,
+  alternando 30 s di alzate laterali e 30 s di alzate frontali a braccia tese fino all'altezza delle spalle,
+  **una alzata ogni 2 secondi circa**. **Obiettivo: Borg 14–16 alla fine.** Taratura del 4 novembre:
+  Borg 16 con questo peso e ritmo, quindi peso e ritmo restano questi per tutto lo studio.
+  Ci si ferma subito in caso di dolore (non è un allenamento).
 - **Riposo (solo B)**: 5 minuti seduta, braccia appoggiate.
 
 ## Calendario
@@ -82,9 +83,24 @@ braccia lungo i fianchi; braccia tese in avanti orizzontali; gomiti piegati a 90
 braccia aperte di lato orizzontali; di nuovo lungo i fianchi.
 Valori attesi (indicativi): elevazione circa 0°, 90°, 0°, 90°, 0°; gomito circa 180°, 180°, 90°, 180°, 180°.
 
+## Verifica degli angoli (4 novembre 2026, prima dei dati)
+
+Webcam del portatile con lo schermo inclinato in avanti per inquadrare la scrivania.
+- Braccia orizzontali (avanti e a T, prima prova): elevazione misurata 83–99° (attesa circa 90°); gomito con braccio
+  teso 163–168° (atteso circa 170–180°).
+- Gomiti a 90° con avambracci sopra la scrivania: gomito misurato 105–120° (sovrastima di circa 15–30°).
+- Braccia tese verso la webcam (seconda prova): gomito 132–142°, elevazione 36–49°: stima peggiore quando le braccia
+  puntano verso la telecamera e in parte fuori inquadratura.
+- Con le braccia lungo i fianchi le mani escono dall'inquadratura (da seduta): valori assenti.
+- Conclusione: gli angoli assoluti hanno errori sistematici di 15–30°; con webcam fissa l'errore è costante, quindi si
+  usano solo le variazioni dopo − prima e solo come misure secondarie. La misura principale (velocità dei polsi) non cambia.
+- Inquadratura del compito (prova di 40 s): spalle, gomiti e polsi visibili nel 100% dei fotogrammi.
+
 ## Modifiche al protocollo
 
 - 4 novembre 2026, prima di raccogliere i dati: da 6 + 6 sessioni in 6 giorni a **4 + 4 in un giorno**
   (ordine A B B A B A A B, pause di 45–60 minuti con regola di recupero), per rispettare la scadenza
   di consegna del 4 dicembre. Conseguenza dichiarata: p minimo 0,029 e sessioni meno indipendenti.
   Peso e ritmo dell'esercizio fissati nella taratura iniziale.
+- 4 novembre 2026, prima dei dati: 20 oggetti invece di 40 (per stare nell'inquadratura) e due fogli al posto dei
+  contenitori; bottiglie da 1,5 L riempite a 0,5 L; taratura: Borg 16.
