@@ -10,6 +10,9 @@ Le decisioni di progetto più importanti, con il motivo. Le voci più recenti so
   decisi in anticipo (variazione dopo − prima della velocità dei polsi, Mann–Whitney A contro B).
 - Motivo del 6 + 6: con 3 + 3 il valore p più basso possibile del Mann–Whitney è 0,10 (mai significativo);
   con 5 + 5 è circa 0,008, con 6 + 6 circa 0,002.
+- Stesso giorno, prima dei dati: scelta di fare il pilota **in una sola giornata**, 8 sessioni (4 A + 4 B) in ordine
+  bilanciato A B B A B A A B, pause di 45–60 minuti con regola di recupero (Borg e battito tornati vicini
+  all'inizio giornata). Prezzo dichiarato: p minimo 0,029 e sessioni meno indipendenti (PROTOCOLLO.md v2).
 - Esercizio a durata fissa con obiettivo Borg ≥ 14–15 (controllo della manipolazione); SPAZIO a ogni giro
   del compito per avere anche una misura oggettiva di prestazione (tempo per giro).
 

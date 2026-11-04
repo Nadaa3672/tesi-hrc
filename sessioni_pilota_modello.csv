@@ -1,3 +1,9 @@
-giorno,data,momento,condizione,sessione_pre,sessione_post,borg_inizio,kss_inizio,borg_dopo_compito1,kss_dopo_compito1,borg_dopo_meta,kss_dopo_meta,borg_fine,kss_fine,bottiglie_litri,note
-1,2026-11-05,mattina,A,,,,,,,,,,,0.5,
-1,2026-11-05,pomeriggio,B,,,,,,,,,,,,
+sessione,ordine,condizione,ora_inizio,sessione_pre,sessione_post,borg_inizio,kss_inizio,battito_inizio,borg_dopo_compito1,kss_dopo_compito1,borg_dopo_meta,kss_dopo_meta,borg_fine,kss_fine,bottiglie_litri,note
+s1,1,A,,,,,,,,,,,,,,
+s2,2,B,,,,,,,,,,,,,,
+s3,3,B,,,,,,,,,,,,,,
+s4,4,A,,,,,,,,,,,,,,
+s5,5,B,,,,,,,,,,,,,,
+s6,6,A,,,,,,,,,,,,,,
+s7,7,A,,,,,,,,,,,,,,
+s8,8,B,,,,,,,,,,,,,,
